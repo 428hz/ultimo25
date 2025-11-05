@@ -1,0 +1,39 @@
+# Clon Instagram Nativo – Entrega
+
+## Requisitos y cumplimiento
+- Autenticación
+  - Email/contraseña y OAuth (Google/Facebook/GitHub) con Supabase Auth (JWT, refresh).
+  - Persistencia de sesión (autoRefreshToken + persistSession).
+- Roles
+  - profiles.role = user | moderator | admin.
+  - Moderador/Admin pueden borrar posts/comentarios de cualquiera.
+  - Admin puede cambiar roles en /admin.
+- UI/Navegación/Estado
+  - Expo Router v6.
+  - Context API para auth y perfil.
+  - Componentes responsivos (React Native).
+- API REST/CRUD
+  - PostgREST /rest/v1 para posts, comments, likes, profiles.
+  - Manejo de errores en UI (alerts) y likes idempotentes.
+
+## Cómo correr
+```bash
+npm install
+npx expo start
+```
+Variables en `.env`:
+- EXPO_PUBLIC_SUPABASE_URL=
+- EXPO_PUBLIC_SUPABASE_ANON_KEY=
+
+## Endpoints REST (ejemplos)
+- GET /rest/v1/posts?select=id,author_id,media_url,text_content,profiles:author_id(username,avatar_url)&order=created_at.desc
+- POST /rest/v1/posts
+- POST/DELETE /rest/v1/likes
+- POST/DELETE /rest/v1/comments
+Autenticación vía header `Authorization: Bearer <token>`.
+
+## Roles y políticas
+Ver `supabase/setup_roles.sql`.
+
+## Panel Admin
+- Ruta `/admin` (solo admin): listado de usuarios y cambio de rol.
