@@ -1,82 +1,97 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useAuth } from '@/context/AuthContext';
+import { Alert, Image, TextInput, View, Button, ActivityIndicator } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/services/supabaseClient';
-import { router } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import { safeCall } from '@/services/errors';
 
-export default function EditProfilePage() {
-  const { session, profile, refreshProfile, signOut } = useAuth();
+export default function EditProfileScreen() {
+  const { profile, ensureProfile, refreshProfile } = useAuth();
   const [username, setUsername] = useState(profile?.username ?? '');
-  const [saving, setSaving] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? '');
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => { setUsername(profile?.username ?? ''); }, [profile?.username]);
+  useEffect(() => {
+    setUsername(profile?.username ?? '');
+    setAvatarUrl(profile?.avatar_url ?? '');
+  }, [profile?.username, profile?.avatar_url]);
 
-  const onSave = async () => {
-    if (!session?.user?.id) return;
-    const clean = username.trim().toLowerCase();
-    if (!/^[a-z0-9_]{3,20}$/.test(clean)) {
-      Alert.alert('Usuario inválido', 'Usa 3-20 caracteres: letras, números o guión bajo.');
+  const pickImage = async () => {
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.9,
+    });
+    if (res.canceled) return;
+    const asset = res.assets[0];
+    if (!asset?.uri) return;
+
+    try {
+      setBusy(true);
+      // subimos a Storage
+      const uid = profile?.id!;
+      const ext = (asset.fileName?.split('.').pop() || 'jpg').toLowerCase();
+      const fileName = `avatars/${uid}-${Date.now()}.${ext}`;
+
+      const blob = await (await fetch(asset.uri)).blob();
+      const { data, error } = await supabase.storage.from('avatars').upload(fileName, blob, {
+        contentType: blob.type || 'image/jpeg',
+        upsert: true,
+      });
+      if (error) throw error;
+
+      const { data: pub } = supabase.storage.from('avatars').getPublicUrl(data.path);
+      setAvatarUrl(pub.publicUrl);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'No se pudo subir la imagen');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const save = async () => {
+    if (!profile?.id) return;
+    setBusy(true);
+    const result = await safeCall(async () => {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ username, avatar_url: avatarUrl })
+        .eq('id', profile.id);
+      return { data: undefined, error };
+    });
+    setBusy(false);
+
+    if (!result.ok) {
+      Alert.alert('Error', result.message);
       return;
     }
-    try {
-      setSaving(true);
-      const { data: exists } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('username', clean)
-        .neq('id', session.user.id)
-        .maybeSingle();
-      if (exists) {
-        Alert.alert('Nombre de usuario ocupado', 'Elige otro nombre de usuario.');
-        return;
-      }
-      const { error } = await supabase.from('profiles').update({ username: clean }).eq('id', session.user.id);
-      if (error) throw error;
-      await refreshProfile();
-      Alert.alert('Guardado', 'Tu perfil fue actualizado.');
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'No se pudo guardar.');
-    } finally {
-      setSaving(false);
-    }
+
+    await refreshProfile();
+    Alert.alert('Listo', 'Perfil actualizado');
   };
 
-  const onSignOut = async () => {
-    try { await signOut(); } finally { router.replace('/auth/login'); }
-  };
+  if (!profile) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator />
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.screen}>
-      <Text style={styles.title}>Editar perfil</Text>
-      <Text style={styles.label}>Nombre de usuario</Text>
+    <View style={{ flex: 1, gap: 12, padding: 16 }}>
+      {avatarUrl ? (
+        <Image source={{ uri: avatarUrl }} style={{ width: 120, height: 120, borderRadius: 60 }} />
+      ) : null}
+      <Button title="Cambiar foto" onPress={pickImage} disabled={busy} />
       <TextInput
+        placeholder="Nombre de usuario"
         value={username}
         onChangeText={setUsername}
         autoCapitalize="none"
-        autoCorrect={false}
-        placeholder="tu_usuario"
-        placeholderTextColor="#777"
-        style={styles.input}
+        style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12 }}
       />
-      <Pressable onPress={onSave} disabled={saving} style={[styles.btn, saving && { opacity: 0.6 }]}>
-        <Text style={styles.btnText}>{saving ? 'Guardando…' : 'Guardar'}</Text>
-      </Pressable>
-
-      <View style={{ height: 24 }} />
-      <Pressable onPress={onSignOut} style={styles.logoutBtn}>
-        <Text style={styles.logoutText}>Cerrar sesión</Text>
-      </Pressable>
+      <Button title={busy ? 'Guardando...' : 'Guardar'} onPress={save} disabled={busy} />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#000', padding: 16 },
-  title: { color: '#fff', fontSize: 18, fontWeight: '700', marginBottom: 12 },
-  label: { color: '#bbb', marginBottom: 6 },
-  input: { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#333', color: '#fff', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 14 },
-  btn: { backgroundColor: '#0095f6', borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
-  btnText: { color: '#fff', fontWeight: '700' },
-  logoutBtn: { borderColor: '#444', borderWidth: 1, borderRadius: 8, paddingVertical: 12, alignItems: 'center', backgroundColor: '#161616' },
-  logoutText: { color: '#ff6b6b', fontWeight: '700' },
-});
