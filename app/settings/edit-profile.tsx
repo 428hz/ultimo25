@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, TextInput, View, Button, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
 import { supabase } from '@/services/supabaseClient';
 import { useAuth } from '@/context/AuthContext';
 import { safeCall } from '@/services/errors';
+import { signOut as signOutService } from '@/services/auth';
 
 export default function EditProfileScreen() {
-  const { profile, ensureProfile, refreshProfile } = useAuth();
+  const router = useRouter();
+  const { profile, refreshProfile } = useAuth();
   const [username, setUsername] = useState(profile?.username ?? '');
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? '');
   const [busy, setBusy] = useState(false);
@@ -28,7 +31,6 @@ export default function EditProfileScreen() {
 
     try {
       setBusy(true);
-      // subimos a Storage
       const uid = profile?.id!;
       const ext = (asset.fileName?.split('.').pop() || 'jpg').toLowerCase();
       const fileName = `avatars/${uid}-${Date.now()}.${ext}`;
@@ -68,6 +70,16 @@ export default function EditProfileScreen() {
 
     await refreshProfile();
     Alert.alert('Listo', 'Perfil actualizado');
+    setTimeout(() => router.back(), 400);
+  };
+
+  const doSignOut = async () => {
+    const res = await signOutService();
+    if (!res.ok) {
+      Alert.alert('Error', res.message);
+      return;
+    }
+    router.replace('/auth/login');
   };
 
   if (!profile) {
@@ -81,7 +93,7 @@ export default function EditProfileScreen() {
   return (
     <View style={{ flex: 1, gap: 12, padding: 16 }}>
       {avatarUrl ? (
-        <Image source={{ uri: avatarUrl }} style={{ width: 120, height: 120, borderRadius: 60 }} />
+        <Image source={{ uri: avatarUrl }} style={{ width: 120, height: 120, borderRadius: 60, alignSelf: 'center' }} />
       ) : null}
       <Button title="Cambiar foto" onPress={pickImage} disabled={busy} />
       <TextInput
@@ -92,6 +104,8 @@ export default function EditProfileScreen() {
         style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12 }}
       />
       <Button title={busy ? 'Guardando...' : 'Guardar'} onPress={save} disabled={busy} />
+      <View style={{ height: 8 }} />
+      <Button title="Cerrar sesión" color="#c0392b" onPress={doSignOut} />
     </View>
   );
 }

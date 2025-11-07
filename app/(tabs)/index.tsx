@@ -1,126 +1,57 @@
-import { useState, useCallback } from 'react';
-import { StyleSheet, View, Text, FlatList, ActivityIndicator } from 'react-native';
-import { useFocusEffect } from 'expo-router';
-import { supabase } from '@/services/supabaseClient';
-import Post from '@/components/Posts/Posts';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, ActivityIndicator, FlatList, RefreshControl, View } from 'react-native';
+import PostCard from '@/components/Posts/PostCard';
+import { listPosts } from '@/services/posts';
 import type { PostData } from '@/components/Posts/types';
 
-const DEBUG = true;
-
-type Row = {
-  id: string | number;
-  author_id: string;
-  media_url: string | null;
-  text_content: string | null;
-  profiles?: {
-    username: string | null;
-    avatar_url: string | null;
-  } | null;
-};
-
-const normalize = (r: Row): PostData => ({
-  id: r.id,
-  author_id: r.author_id,
-  media_url: r.media_url ?? '',
-  text_content: r.text_content ?? '',
-  profiles: {
-    username: r.profiles?.username ?? '',
-    avatar_url: r.profiles?.avatar_url ?? null,
-  },
-});
-
-export default function HomePage() {
+export default function FeedScreen() {
   const [posts, setPosts] = useState<PostData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
+  const load = useCallback(async () => {
+    const res = await listPosts();
+    if (!res.ok) {
+      Alert.alert('Error', res.message);
+      return;
+    }
+    // listPosts devuelve id/author_id/media_url/text_content; PostCard acepta profiles como opcional
+    setPosts(res.data as unknown as PostData[]);
+  }, []);
 
-      const fetchPosts = async () => {
-        setLoading(true);
-        setErrMsg(null);
-        DEBUG && console.time('[Home] fetchPosts');
-        try {
-          DEBUG && console.log('[Home] query /rest/v1/posts start');
-          const { data, error, status } = await supabase
-            .from('posts')
-            .select(`
-              id, author_id, media_url, text_content,
-              profiles:author_id ( username, avatar_url )
-            `)
-            .order('created_at', { ascending: false })
-            .limit(50);
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      await load();
+      setLoading(false);
+    })();
+  }, [load]);
 
-          DEBUG && console.log('[Home] query result', { status, rows: (data as any[])?.length ?? 0, error: error?.message });
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
 
-          if (error) throw error;
-
-          const rows = ((data ?? []) as unknown) as Row[];
-          const normalized = rows.map(normalize);
-          if (!cancelled) setPosts(normalized);
-        } catch (e: any) {
-          const msg = e?.message || e?.error_description || 'No se pudieron cargar las publicaciones. Revisa policies/Network.';
-          DEBUG && console.error('[Home] fetch error', msg, e);
-          setErrMsg(msg);
-        } finally {
-          DEBUG && console.timeEnd('[Home] fetchPosts');
-          if (!cancelled) setLoading(false);
-        }
-      };
-
-      fetchPosts();
-      return () => { cancelled = true; };
-    }, [])
-  );
+  const handleDeleted = useCallback((deletedId: string | number) => {
+    setPosts((prev) => prev.filter((p) => String(p.id) !== String(deletedId)));
+  }, []);
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#ffffff" />
-      </View>
-    );
-  }
-
-  if (errMsg) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{errMsg}</Text>
-        <Text style={styles.hint}>
-          Revisá Network → /rest/v1/posts. Si devuelve 401/403, son las policies RLS o la sesión.
-        </Text>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <FlatList
-        style={styles.feed}
-        data={posts}
-        renderItem={({ item }) => (
-          <Post
-            postData={item}
-            onDelete={(id) => setPosts((cur) => cur.filter((p) => String(p.id) !== String(id)))}
-          />
-        )}
-        keyExtractor={(item) => String(item.id)}
-        ListEmptyComponent={() => (
-          <View style={styles.centered}>
-            <Text style={styles.emptyText}>Todavía no hay publicaciones. ¡Sé el primero!</Text>
-          </View>
-        )}
-      />
-    </View>
+    <FlatList
+      data={posts}
+      keyExtractor={(p) => String(p.id)}
+      renderItem={({ item }) => <PostCard postData={item} onDelete={handleDeleted} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      contentContainerStyle={{ paddingBottom: 80 }}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000', alignItems: 'center' },
-  feed: { width: '100%', maxWidth: 614 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000', padding: 16 },
-  emptyText: { color: '#a8a8a8', fontSize: 16, textAlign: 'center' },
-  errorText: { color: '#ff6b6b', fontSize: 14, textAlign: 'center', marginBottom: 8 },
-  hint: { color: '#bbb', fontSize: 12, textAlign: 'center', maxWidth: 520 },
-});

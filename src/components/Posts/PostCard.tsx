@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/services/supabaseClient';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import PostHeader from './PostHeader';
 import PostMedia from './PostMedia';
@@ -11,6 +10,7 @@ import CommentInput from './Comments/CommentInput';
 import { useComments, useLikes, useNormalizedPostId } from './hooks';
 import type { PostProps } from './types';
 import { isModerator } from '@/utils/rbac';
+import { deletePost } from '@/services/posts';
 
 export default function PostCard({ postData, onDelete }: PostProps) {
   const { session, profile } = useAuth();
@@ -45,11 +45,12 @@ export default function PostCard({ postData, onDelete }: PostProps) {
   const handleDeletePost = async () => {
     try {
       setDeletingPost(true);
-      const { error } = await supabase.from('posts').delete().eq('id', postId);
-      if (error) throw error;
+      const res = await deletePost(String(postId));
+      if (!res.ok) {
+        Alert.alert('Error', res.message);
+        return;
+      }
       onDelete?.(postId);
-    } catch (e) {
-      console.error('Delete post error:', e);
     } finally {
       setDeletingPost(false);
       setConfirmVisible(false);
@@ -66,8 +67,6 @@ export default function PostCard({ postData, onDelete }: PostProps) {
     try {
       setDeletingCommentId(selectedCommentId);
       await remove(selectedCommentId);
-    } catch (e) {
-      console.error('Delete comment error:', e);
     } finally {
       setDeletingCommentId(null);
       setSelectedCommentId(null);
@@ -90,7 +89,7 @@ export default function PostCard({ postData, onDelete }: PostProps) {
       <PostHeader
         profile={postData.profiles}
         authorFallback={postData.author_id}
-        isOwner={!!canDeletePost}          // ahora significa "puede borrar" (owner o moderador/admin)
+        isOwner={!!canDeletePost}
         deleting={deletingPost}
         onPressDelete={() => setConfirmVisible(true)}
       />
@@ -121,7 +120,7 @@ export default function PostCard({ postData, onDelete }: PostProps) {
           <CommentsList
             comments={comments}
             currentUserId={userId}
-            isPostOwner={!!canDeletePost}   // permite borrar comentarios si es owner o moderador/admin
+            isPostOwner={!!canDeletePost}
             deletingCommentId={deletingCommentId}
             onRequestDelete={requestDeleteComment}
           />

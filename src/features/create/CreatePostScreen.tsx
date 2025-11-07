@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform, StyleSheet, Text, View, Alert } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useCreatePost } from './hooks/useCreatePost';
@@ -34,31 +34,37 @@ export default function CreatePostScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Crear publicación</Text>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: '#000' }}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.title}>Crear publicación</Text>
 
-      <ImagePickerField imageUri={imageUri} onPick={pickImage} />
+        <ImagePickerField imageUri={imageUri} onPick={pickImage} />
 
-      <CaptionInput value={description} onChange={setDescription} />
+        <CaptionInput value={description} onChange={setDescription} />
 
-      <PublishActions
-        canPublish={!!canPublish}
-        uploading={uploading}
-        onPublish={handlePublish}
-        onClear={clear}
-      />
+        <PublishActions
+          canPublish={!!canPublish}
+          uploading={uploading}
+          onPublish={handlePublish}
+          onClear={clear}
+        />
 
-      {Platform.OS === 'web' && (
-        <Text style={styles.hint}>
-          Si el selector falla en web, te paso una variante con input file nativo.
-        </Text>
-      )}
-    </View>
+        {Platform.OS === 'web' && (
+          <Text style={styles.hint}>
+            Si el selector falla en web, te paso una variante con input file nativo.
+          </Text>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000', padding: 16, alignItems: 'center' },
-  title: { color: '#fff', fontSize: 18, fontWeight: '700', marginBottom: 12, alignSelf: 'flex-start' },
-  hint: { color: '#777', fontSize: 12, marginTop: 12, alignSelf: 'flex-start' },
+  content: { padding: 16, paddingBottom: 120, gap: 12 },
+  title: { color: '#fff', fontSize: 18, fontWeight: '700', marginBottom: 8 },
+  hint: { color: '#777', fontSize: 12, marginTop: 12 },
 });

@@ -96,11 +96,10 @@ export function useComments(postId: number) {
 
     try {
       const { data, error } = await supabase
-        .from('comments')
-        .select('id, content, author_id, created_at')
-        .eq('post_id', postId)
-        .order('created_at', { ascending: false })
-        .limit(2);
+  .from('comments')
+  .select('id, post_id, author_id, content, created_at')
+  .eq('post_id', postId)
+  .order('created_at', { ascending: true });
 
       if (error) throw error;
 

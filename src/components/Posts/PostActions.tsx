@@ -20,9 +20,7 @@ export default function PostActions({ liked, likesText, onToggleLike, onToggleCo
           <Ionicons name="chatbubble-outline" size={26} color="#fff" />
         </Pressable>
         <Ionicons name="paper-plane-outline" size={26} color="#fff" />
-        <View style={{ marginLeft: 'auto' }}>
-          <Ionicons name="bookmark-outline" size={26} color="#fff" />
-        </View>
+        {/* Bookmark removido por ahora */}
       </View>
       <Text style={styles.likesText}>{likesText}</Text>
     </>

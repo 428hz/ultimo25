@@ -2,9 +2,10 @@ import 'react-native-get-random-values';
 import 'react-native-url-polyfill/auto';
 import { LogBox } from 'react-native';
 LogBox.ignoreLogs(['pointerEvents is deprecated', 'aria-hidden on an element']);
-import React from 'react';
+
+import React, { useEffect, useRef } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { Redirect, Slot, usePathname } from 'expo-router';
+import { Slot, usePathname, useRouter } from 'expo-router';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 
 export default function RootLayout() {
@@ -18,6 +19,34 @@ export default function RootLayout() {
 function Guard() {
   const { isAuth, loading } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
+  const lastRedirectRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (loading) return;
+
+    const authPages =
+      pathname === '/auth/login' ||
+      pathname === '/auth/register' ||
+      pathname === '/auth/callback';
+
+    let target: string | null = null;
+
+    if (!isAuth && !authPages) {
+      target = '/auth/login';
+    } else if (isAuth && authPages) {
+      target = '/';
+    }
+
+    if (
+      target &&
+      target !== pathname &&
+      target !== lastRedirectRef.current
+    ) {
+      lastRedirectRef.current = target;
+      router.replace(target);
+    }
+  }, [loading, isAuth, pathname, router]);
 
   if (loading) {
     return (
@@ -25,16 +54,6 @@ function Guard() {
         <ActivityIndicator color="#fff" />
       </View>
     );
-  }
-
-  const authPages = pathname === '/auth/login' || pathname === '/auth/register' || pathname === '/auth/callback';
-
-  if (!isAuth && !authPages) {
-    return <Redirect href="/auth/login" />;
-  }
-
-  if (isAuth && authPages) {
-    return <Redirect href="/" />;
   }
 
   return <Slot />;

@@ -27,15 +27,8 @@
         {
           "action": "VIEW",
           "autoVerify": false,
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ],
-          "data": [
-            {
-              "scheme": "cloninstagramnativo"
-            }
-          ]
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [{ "scheme": "cloninstagramnativo" }]
         }
       ]
     },
@@ -47,7 +40,8 @@
     "plugins": [
       "expo-router",
       "expo-web-browser",
-      "expo-font"
+      "expo-font",
+      "expo-env"
     ],
     "experiments": {
       "typedRoutes": true
