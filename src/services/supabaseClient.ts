@@ -4,6 +4,7 @@ const SUPABASE_URL = (process.env.EXPO_PUBLIC_SUPABASE_URL || '').trim();
 const SUPABASE_ANON_KEY = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '').trim();
 
 if (__DEV__) {
+  // Debe imprimir true/true si .env está ok
   // eslint-disable-next-line no-console
   console.log('[Supabase] URL present?', !!SUPABASE_URL, 'Key present?', !!SUPABASE_ANON_KEY);
 }

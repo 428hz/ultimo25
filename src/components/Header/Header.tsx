@@ -17,6 +17,12 @@ export default function Header({ hideProfileIcon }: Props) {
       </Link>
 
       <View style={styles.actions}>
+        <Link href="/search" asChild>
+          <Pressable>
+            <Ionicons name="search-outline" size={22} color="#fff" />
+          </Pressable>
+        </Link>
+
         <Link href="/" asChild>
           <Pressable>
             <Ionicons name="home-outline" size={22} color="#fff" />

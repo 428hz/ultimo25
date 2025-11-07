@@ -13,9 +13,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "ios": {
-      "supportsTablet": true
-    },
+    "ios": { "supportsTablet": true },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
@@ -40,11 +38,8 @@
     "plugins": [
       "expo-router",
       "expo-web-browser",
-      "expo-font",
-      "expo-env"
+      "expo-font"
     ],
-    "experiments": {
-      "typedRoutes": true
-    }
+    "experiments": { "typedRoutes": true }
   }
 }

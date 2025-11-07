@@ -12,23 +12,14 @@ export default function CreatePostScreen() {
   const userId = session?.user?.id || null;
   const router = useRouter();
 
-  const {
-    description,
-    setDescription,
-    uploading,
-    imageUri,
-    canPublish,
-    pickImage,
-    publish,
-    clear,
-  } = useCreatePost(userId);
+  const { description, setDescription, uploading, imageUri, canPublish, pickImage, publish, clear } =
+    useCreatePost(userId);
 
   const handlePublish = async () => {
     try {
       const ok = await publish();
       if (ok) router.replace('/');
     } catch (e: any) {
-      console.error('Publicar error:', e?.message || e);
       Alert.alert('Error', e?.message ?? 'No se pudo crear la publicación.');
     }
   };
@@ -40,31 +31,20 @@ export default function CreatePostScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.title}>Crear publicación</Text>
-
-        <ImagePickerField imageUri={imageUri} onPick={pickImage} />
-
-        <CaptionInput value={description} onChange={setDescription} />
-
-        <PublishActions
-          canPublish={!!canPublish}
-          uploading={uploading}
-          onPublish={handlePublish}
-          onClear={clear}
-        />
-
-        {Platform.OS === 'web' && (
-          <Text style={styles.hint}>
-            Si el selector falla en web, te paso una variante con input file nativo.
-          </Text>
-        )}
+        <View style={styles.centered}>
+          <Text style={styles.title}>Crear publicación</Text>
+          <ImagePickerField imageUri={imageUri} onPick={pickImage} />
+          <CaptionInput value={description} onChange={setDescription} />
+          <PublishActions canPublish={!!canPublish} uploading={uploading} onPublish={handlePublish} onClear={clear} />
+          <View style={{ height: 40 }} />
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, paddingBottom: 120, gap: 12 },
-  title: { color: '#fff', fontSize: 18, fontWeight: '700', marginBottom: 8 },
-  hint: { color: '#777', fontSize: 12, marginTop: 12 },
+  content: { padding: 16, paddingBottom: 140, flexGrow: 1 },
+  centered: { width: '100%', maxWidth: 614, alignSelf: 'center', gap: 12 },
+  title: { color: '#fff', fontSize: 18, fontWeight: '700', marginBottom: 4 },
 });

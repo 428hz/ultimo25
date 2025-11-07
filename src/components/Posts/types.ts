@@ -1,7 +1,7 @@
 export type ProfileSlim = { username: string; avatar_url: string | null };
 
 export type Comment = {
-  id: string; // normalizamos a string para comparaciones en UI
+  id: string;
   content: string;
   author_id?: string;
   author?: ProfileSlim | null;
@@ -9,11 +9,12 @@ export type Comment = {
 };
 
 export type PostData = {
-  id: string | number; // puede venir en string; lo normalizamos a number para queries
+  id: string | number;
   author_id: string;
   media_url: string | null;
   text_content: string | null;
-  profiles?: ProfileSlim;
+  // Permitimos también null porque los SELECT pueden traer null si aún no hay perfil asociado
+  profiles?: ProfileSlim | null;
 };
 
 export type PostProps = {

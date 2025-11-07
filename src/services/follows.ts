@@ -1,60 +1,72 @@
 import { supabase } from '@/services/supabaseClient';
 import { Result, safeCall } from './errors';
 
-/**
- * Usamos la tabla 'follows' (follower_id, following_id).
- * Si tu app usa 'followers' también, avisame y adapto.
- */
-
 export async function isFollowing(targetUserId: string): Promise<Result<boolean>> {
   return safeCall(async () => {
+    const { data: sess } = await supabase.auth.getSession();
+    const me = sess.session?.user?.id;
+    if (!me) return { data: false, error: null as any };
+
     const { data, error } = await supabase
       .from('follows')
-      .select('follower_id', { count: 'exact', head: true })
-      .eq('following_id', targetUserId);
-    // data es null en count-only; usá supabase.getCount()
-    // Pero en v2, count viene en la respuesta si select head:true
-    // El SDK no expone count aquí, así que hacemos otra consulta mínima:
-    const { data: rows, error: err2 } = await supabase
-      .from('follows')
-      .select('id')
-      .eq('following_id', targetUserId)
+      .select('id', { count: 'exact', head: false })
+      .eq('follower_user_id', me)
+      .eq('target_user_id', targetUserId)
       .limit(1);
-    const finalError = error || err2;
-    return { data: !!rows?.length, error: finalError };
+
+    if (error) return { data: false, error };
+    return { data: (data?.length ?? 0) > 0, error: null as any };
   });
 }
 
 export async function followUser(targetUserId: string): Promise<Result<void>> {
   return safeCall(async () => {
-    const { error } = await supabase.from('follows').insert({ following_id: targetUserId });
+    const { data: sess } = await supabase.auth.getSession();
+    const me = sess.session?.user?.id;
+    if (!me) throw new Error('No autenticado');
+
+    const { error } = await supabase.from('follows').insert({
+      follower_user_id: me,
+      target_user_id: targetUserId,
+    });
     return { data: undefined as void, error };
   });
 }
 
 export async function unfollowUser(targetUserId: string): Promise<Result<void>> {
   return safeCall(async () => {
-    const { error } = await supabase.from('follows').delete().eq('following_id', targetUserId);
+    const { data: sess } = await supabase.auth.getSession();
+    const me = sess.session?.user?.id;
+    if (!me) throw new Error('No autenticado');
+
+    const { error } = await supabase
+      .from('follows')
+      .delete()
+      .eq('follower_user_id', me)
+      .eq('target_user_id', targetUserId);
+
     return { data: undefined as void, error };
   });
 }
 
 export async function countFollowers(userId: string): Promise<Result<number>> {
   return safeCall(async () => {
-    const { data, error } = await supabase
+    const { count, error } = await supabase
       .from('follows')
-      .select('id')
-      .eq('following_id', userId);
-    return { data: data?.length ?? 0, error };
+      .select('id', { count: 'exact', head: false })
+      .eq('target_user_id', userId);
+
+    return { data: count ?? 0, error };
   });
 }
 
 export async function countFollowing(userId: string): Promise<Result<number>> {
   return safeCall(async () => {
-    const { data, error } = await supabase
+    const { count, error } = await supabase
       .from('follows')
-      .select('id')
-      .eq('follower_id', userId);
-    return { data: data?.length ?? 0, error };
+      .select('id', { count: 'exact', head: false })
+      .eq('follower_user_id', userId);
+
+    return { data: count ?? 0, error };
   });
 }

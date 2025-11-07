@@ -1,46 +1,70 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import type { ProfileSlim } from './types';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Link } from 'expo-router';
+
+type ProfileSlim = { username: string; avatar_url: string | null };
 
 type Props = {
   profile?: ProfileSlim;
   authorFallback: string;
-  isOwner: boolean;
+  isOwner?: boolean;
   deleting?: boolean;
   onPressDelete?: () => void;
 };
 
-export default function PostHeader({ profile, authorFallback, isOwner, deleting, onPressDelete }: Props) {
-  const username = profile?.username ?? authorFallback ?? 'usuario';
+export default function PostHeader({ profile, authorFallback }: Props) {
+  const username = profile?.username || null;
+  const avatarUri = profile?.avatar_url ?? undefined;
+
+  const initial = (username?.[0] ?? authorFallback?.[0] ?? '?').toUpperCase();
+
+  const AvatarNode = avatarUri ? (
+    <Image source={{ uri: avatarUri }} style={styles.avatar} />
+  ) : (
+    <View style={[styles.avatar, styles.avatarPlaceholder]}>
+      <Text style={styles.avatarInitial}>{initial}</Text>
+    </View>
+  );
+
+  const TitleNode = username ? (
+    <Link href={{ pathname: '/[username]', params: { username } }} asChild>
+      <Pressable>
+        <Text style={styles.username}>@{username}</Text>
+      </Pressable>
+    </Link>
+  ) : (
+    <Text style={styles.usernameMuted}>{shortId(authorFallback)}</Text>
+  );
 
   return (
-    <View style={styles.header}>
-      <Image
-        source={{ uri: profile?.avatar_url || `https://i.pravatar.cc/150?u=${username}` }}
-        style={styles.avatar}
-      />
-
-      <Pressable onPress={() => router.push(`/${username}`)} style={{ flex: 1 }}>
-        <Text style={styles.username}>{username}</Text>
-      </Pressable>
-
-      {isOwner && (
-        <Pressable onPress={onPressDelete} disabled={!!deleting} style={{ marginLeft: 'auto' }}>
-          {deleting ? (
-            <ActivityIndicator color="#f55" />
-          ) : (
-            <Ionicons name="trash-outline" size={22} color="#f55" />
-          )}
-        </Pressable>
-      )}
+    <View style={styles.wrap}>
+      {AvatarNode}
+      <View style={{ flexDirection: 'column' }}>{TitleNode}</View>
     </View>
   );
 }
 
+function shortId(id: string) {
+  if (!id) return 'usuario';
+  if (id.length <= 10) return id;
+  return `${id.slice(0, 6)}…${id.slice(-4)}`;
+}
+
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatar: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: '#555' },
+  wrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#222' },
+  avatarPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2c2c2c',
+  },
+  avatarInitial: { color: '#eaeaea', fontWeight: '700', fontSize: 16 },
   username: { color: '#fff', fontWeight: '600' },
+  usernameMuted: { color: '#aaa', fontWeight: '600' },
 });

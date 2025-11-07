@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 type Props = {
   imageUri: string | null;
@@ -8,29 +8,46 @@ type Props = {
 
 export default function ImagePickerField({ imageUri, onPick }: Props) {
   return (
-    <TouchableOpacity style={styles.imagePicker} onPress={onPick}>
-      {imageUri ? (
-        <Image source={{ uri: imageUri }} style={styles.imagePreview} resizeMode="cover" />
-      ) : (
-        <Text style={styles.imagePlaceholder}>Toca para elegir una imagen</Text>
-      )}
-    </TouchableOpacity>
+    <View style={styles.wrap}>
+      <Pressable onPress={onPick} style={styles.button}>
+        <Text style={styles.btnTxt}>Cambiar imagen</Text>
+      </Pressable>
+
+      <View style={styles.preview}>
+        {imageUri ? (
+          <Image source={{ uri: imageUri }} style={styles.image} />
+        ) : (
+          <Text style={{ color: '#777' }}>Sin imagen</Text>
+        )}
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  imagePicker: {
-    width: '100%',
-    maxWidth: 614,
-    aspectRatio: 1,
-    borderWidth: 1,
-    borderColor: '#363636',
-    borderRadius: 8,
-    backgroundColor: '#101010',
-    justifyContent: 'center',
+  wrap: { gap: 10 },
+  button: {
+    backgroundColor: '#222',
+    borderRadius: 10,
+    paddingVertical: 10,
     alignItems: 'center',
-    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#333',
   },
-  imagePreview: { width: '100%', height: '100%' },
-  imagePlaceholder: { color: '#aaa' },
+  btnTxt: { color: '#ddd', fontWeight: '700' },
+  preview: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2c2c2c',
+    backgroundColor: '#0b0b0b',
+    padding: 8,
+    minHeight: 120,
+  },
+  image: {
+    width: '100%',
+    aspectRatio: 1,
+    resizeMode: 'contain',
+    borderRadius: 8,
+    backgroundColor: '#000',
+  },
 });
