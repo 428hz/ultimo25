@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { countFollowers, countFollowing } from '@/services/follows';
+import { Link } from 'expo-router';
 
-export default function ProfileStats({ userId }: { userId: string }) {
-  const [followers, setFollowers] = useState(0);
-  const [following, setFollowing] = useState(0);
+export default function ProfileStats({ userId, username }: { userId: string; username?: string | null }) {
+  const [followers, setFollowers] = useState<number | null>(null);
+  const [following, setFollowing] = useState<number | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -14,23 +15,27 @@ export default function ProfileStats({ userId }: { userId: string }) {
       if (a.ok) setFollowers(a.data);
       if (b.ok) setFollowing(b.data);
     })();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [userId]);
+
+  const uname = username || 'usuario';
 
   return (
     <View style={styles.row}>
-      <Text style={styles.stat}><Text style={styles.bold}>{followers}</Text> seguidores</Text>
+      <Link href={`/${uname}/followers`} asChild>
+        <Pressable><Text style={styles.stat}><Text style={styles.bold}>{followers ?? '…'}</Text> seguidores</Text></Pressable>
+      </Link>
       <Text style={styles.dot}>•</Text>
-      <Text style={styles.stat}><Text style={styles.bold}>{following}</Text> seguidos</Text>
+      <Link href={`/${uname}/following`} asChild>
+        <Pressable><Text style={styles.stat}><Text style={styles.bold}>{following ?? '…'}</Text> seguidos</Text></Pressable>
+      </Link>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingHorizontal: 10, marginTop: 8 },
-  stat: { color: '#eaeaea' },
+  row: { flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 6 },
+  stat: { color: '#eaeaea', fontSize: 14 },
   dot: { color: '#777' },
   bold: { fontWeight: '700', color: '#fff' },
 });

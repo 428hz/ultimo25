@@ -1,176 +1,82 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/services/supabaseClient';
+
+type UserSession = Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session'];
 
 type Profile = {
   id: string;
   username: string | null;
   avatar_url: string | null;
-  role?: 'user' | 'moderator' | 'admin';
-  updated_at?: string | null;
 };
 
-type AuthContextType = {
-  session: import('@supabase/supabase-js').Session | null;
+type AuthCtx = {
+  session: UserSession | null;
   profile: Profile | null;
-  loading: boolean;   // solo para “primera carga”
-  isAuth: boolean;
+  loading: boolean;
   refreshProfile: () => Promise<void>;
-  ensureProfile: () => Promise<Profile | null>;
+  updateProfile: (patch: Partial<Profile>) => Promise<boolean>;
   signOut: () => Promise<void>;
 };
 
-const AuthContext = createContext<AuthContextType>({
+const Ctx = createContext<AuthCtx>({
   session: null,
   profile: null,
   loading: true,
-  isAuth: false,
   refreshProfile: async () => {},
-  ensureProfile: async () => null,
+  updateProfile: async () => false,
   signOut: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<import('@supabase/supabase-js').Session | null>(null);
+  const [session, setSession] = useState<UserSession | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true); // solo “bootstrap”
-  const initializedRef = useRef(false);         // evita doble init en dev
+  const [loading, setLoading] = useState(true);
 
   const fetchProfile = useCallback(async (uid: string) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, username, avatar_url, role, updated_at')
+      .select('id, username, avatar_url')
       .eq('id', uid)
       .maybeSingle();
-    if (error) {
-      console.error('fetchProfile error:', error.message);
-      return null;
-    }
-    return (data as Profile) ?? null;
+
+    if (error) throw error;
+    return data as Profile | null;
   }, []);
 
-  const generateUsername = (u: import('@supabase/supabase-js').User) => {
-    const meta = (u.user_metadata || {}) as Record<string, any>;
-    const fromMeta = meta.preferred_username || meta.user_name || meta.name;
-    const fromEmail = u.email?.split('@')[0];
-    const base = (fromMeta || fromEmail || 'usuario')
-      .toString()
-      .toLowerCase()
-      .replace(/[^a-z0-9_]+/g, '_')
-      .replace(/^_+|_+$/g, '') || 'usuario';
-    return base.slice(0, 20);
-  };
-
-  const ensureUniqueUsername = useCallback(async (base: string) => {
-    const tryUser = async (candidate: string) => {
-      const { data } = await supabase.from('profiles').select('id').eq('username', candidate).maybeSingle();
-      return data ? null : candidate;
-    };
-    const first = await tryUser(base);
-    if (first) return first;
-    for (let i = 1; i <= 50; i++) {
-      const candidate = `${base}_${i}`;
-      const ok = await tryUser(candidate);
-      if (ok) return ok;
+  const ensureProfile = useCallback(async (uid: string, email?: string | null) => {
+    let p = await fetchProfile(uid);
+    if (!p) {
+      const fallback = (email?.split('@')[0] || 'usuario') + '';
+      const { error } = await supabase
+        .from('profiles')
+        .insert({ id: uid, username: fallback });
+      if (error) throw error;
+      p = await fetchProfile(uid);
     }
-    return `${base}_${Math.floor(1000 + Math.random() * 9000)}`;
-  }, []);
-
-  const upsertProfile = useCallback(async (u: import('@supabase/supabase-js').User) => {
-    const meta = (u.user_metadata || {}) as Record<string, any>;
-    const avatar = meta.avatar_url || meta.picture || null;
-
-    const base = generateUsername(u);
-    const username = await ensureUniqueUsername(base);
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .upsert(
-        {
-          id: u.id,
-          username,
-          avatar_url: avatar,
-        },
-        { onConflict: 'id' }
-      )
-      .select('id, username, avatar_url, role, updated_at')
-      .single();
-
-    if (error) {
-      console.error('upsertProfile error:', error.message);
-      return null;
-    }
-    return data as Profile;
-  }, [ensureUniqueUsername]);
-
-  const ensureProfile = useCallback(async () => {
-    const uid = session?.user?.id;
-    if (!uid) return null;
-
-    if (profile?.id === uid) return profile;
-
-    const existing = await fetchProfile(uid);
-    if (existing) {
-      setProfile(existing);
-      return existing;
-    }
-
-    const created = await upsertProfile(session.user);
-    if (created) setProfile(created);
-    return created;
-  }, [fetchProfile, profile, session?.user, upsertProfile]);
-
-  // Para poder llamar ensureProfile dentro del listener sin volver a montar el efecto
-  const ensureProfileRef = useRef(ensureProfile);
-  useEffect(() => {
-    ensureProfileRef.current = ensureProfile;
-  }, [ensureProfile]);
-
-  // Bootstrap: solo una vez (aunque React dev doble-monte)
-  useEffect(() => {
-    if (initializedRef.current) return;
-    initializedRef.current = true;
-
-    let cancelled = false;
-
-    (async () => {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase.auth.getSession();
-        if (error) console.error('Auth getSession error:', error.message);
-        if (!cancelled) setSession(data?.session ?? null);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    const { data: sub } = supabase.auth.onAuthStateChange(async (event, sess) => {
-      setSession(sess ?? null);
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        try {
-          await ensureProfileRef.current();
-        } catch (e) {
-          console.warn('ensureProfile in listener failed:', (e as any)?.message);
-        }
-      }
-      if (event === 'SIGNED_OUT') {
-        setProfile(null);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      sub.subscription.unsubscribe();
-    };
-  }, []);
+    setProfile(p);
+  }, [fetchProfile]);
 
   const refreshProfile = useCallback(async () => {
-    if (!session?.user?.id) {
-      setProfile(null);
-      return;
-    }
-    const p = await fetchProfile(session.user.id);
+    const uid = session?.user?.id;
+    if (!uid) return;
+    const p = await fetchProfile(uid);
     setProfile(p);
-  }, [fetchProfile, session?.user?.id]);
+  }, [session, fetchProfile]);
+
+  const updateProfile = useCallback(async (patch: Partial<Profile>) => {
+    const uid = session?.user?.id;
+    if (!uid) return false;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ ...patch, id: uid })
+      .eq('id', uid);
+    if (error) {
+      console.warn('[updateProfile] error', error);
+      return false;
+    }
+    await refreshProfile();
+    return true;
+  }, [session, refreshProfile]);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
@@ -178,22 +84,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
   }, []);
 
-  const value = useMemo(
-    () => ({
-      session,
-      profile,
-      loading,               // solo “primera carga”
-      isAuth: !!session?.user,
-      refreshProfile,
-      ensureProfile,
-      signOut,
-    }),
-    [session, profile, loading, refreshProfile, ensureProfile, signOut]
-  );
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      setSession(data.session);
+      setLoading(false);
+      const uid = data.session?.user?.id || null;
+      if (uid) {
+        await ensureProfile(uid, data.session?.user?.email);
+      }
+    })();
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, sess) => {
+      setSession(sess);
+      if (sess?.user?.id) {
+        await ensureProfile(sess.user.id, sess.user.email);
+      } else {
+        setProfile(null);
+      }
+    });
+
+    return () => {
+      sub.subscription.unsubscribe();
+    };
+  }, [ensureProfile]);
+
+  const value = useMemo<AuthCtx>(() => ({
+    session,
+    profile,
+    loading,
+    refreshProfile,
+    updateProfile,
+    signOut,
+  }), [session, profile, loading, refreshProfile, updateProfile, signOut]);
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 export function useAuth() {
-  return useContext(AuthContext);
+  return useContext(Ctx);
 }

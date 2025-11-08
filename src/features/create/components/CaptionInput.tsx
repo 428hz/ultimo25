@@ -1,37 +1,37 @@
 import React from 'react';
-import { StyleSheet, TextInput } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 
-type Props = {
+export default function CaptionInput({
+  value,
+  onChange,
+}: {
   value: string;
   onChange: (t: string) => void;
-};
-
-export default function CaptionInput({ value, onChange }: Props) {
+}) {
   return (
-    <TextInput
-      value={value}
-      onChangeText={onChange}
-      placeholder="Escribe un pie de foto..."
-      placeholderTextColor="#888"
-      style={styles.input}
-      multiline
-    />
+    <View style={styles.wrap}>
+      <TextInput
+        placeholder="Escribe un pie de foto..."
+        placeholderTextColor="#777"
+        value={value}
+        onChangeText={onChange}
+        multiline
+        style={styles.input}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrap: {},
   input: {
-    width: '100%',
-    maxWidth: 614,
-    marginTop: 12,
-    backgroundColor: '#1a1a1a',
     borderWidth: 1,
-    borderColor: '#363636',
-    borderRadius: 8,
-    color: '#fff',
+    borderColor: '#333',
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    minHeight: 80,
-    textAlignVertical: 'top',
+    color: '#fff',
+    minHeight: 44,
+    maxHeight: 160,
   },
 });

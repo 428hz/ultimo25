@@ -28,7 +28,9 @@ export default function MeScreen() {
           )}
           <Text style={styles.username}>{profile?.username ?? 'usuario'}</Text>
         </View>
-        <ProfileStats userId={userId} />
+
+        <ProfileStats userId={userId} username={profile?.username} />
+
         <Link href="/settings/edit-profile" asChild>
           <Pressable style={styles.btn}>
             <Text style={styles.btnTxt}>Editar perfil</Text>

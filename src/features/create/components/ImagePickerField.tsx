@@ -1,10 +1,7 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
-type Props = {
-  imageUri: string | null;
-  onPick: () => void;
-};
+type Props = { imageUri: string | null; onPick: () => void };
 
 export default function ImagePickerField({ imageUri, onPick }: Props) {
   return (
@@ -43,11 +40,5 @@ const styles = StyleSheet.create({
     padding: 8,
     minHeight: 120,
   },
-  image: {
-    width: '100%',
-    aspectRatio: 1,
-    resizeMode: 'contain',
-    borderRadius: 8,
-    backgroundColor: '#000',
-  },
+  image: { width: '100%', aspectRatio: 1, resizeMode: 'contain', borderRadius: 8, backgroundColor: '#000' },
 });
