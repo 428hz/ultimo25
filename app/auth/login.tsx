@@ -1,42 +1,76 @@
-import React, { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Link } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Link, useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { supabase } from '@/services/supabaseClient';
 import Divider from '@/components/common/Divider';
+import { useAuth } from '@/context/AuthContext';
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { refreshProfile } = useAuth();
+
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const signInEmail = async () => {
+  const canSubmit = email.trim().length > 0 && pass.length > 0 && !loading;
+
+  const signInEmail = useCallback(async () => {
+    if (!canSubmit) return;
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pass });
-      if (error) throw error;
-      // El Guard en app/_layout.tsx redirige al Home tras autenticación
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: pass,
+      });
+      if (error) {
+        console.error('[Login] signInWithPassword error:', error);
+        Alert.alert('Error', error.message ?? 'No se pudo iniciar sesión.');
+        return;
+      }
+      console.log('[Login] signIn ok, user:', data.user?.id);
+      await refreshProfile(); // hidrata el perfil en el contexto
+      router.replace('/');    // ir a tabs/home
     } catch (e: any) {
+      console.error('[Login] unexpected:', e);
       Alert.alert('Error', e?.message ?? 'No se pudo iniciar sesión.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [canSubmit, email, pass, refreshProfile, router]);
 
-  const signInOAuth = async (provider: 'google' | 'facebook' | 'github') => {
+  const signInOAuth = useCallback(async (provider: 'google' | 'facebook' | 'github') => {
     try {
       setLoading(true);
-      const redirectTo = Linking.createURL('/auth/callback');
-      const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo } });
-      if (error) throw error;
+      const redirectTo =
+        Platform.OS === 'web'
+          ? `${window.location.origin}/auth/callback`
+          : Linking.createURL('/auth/callback');
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo,
+          scopes: provider === 'facebook' ? 'public_profile,email' : undefined,
+        },
+      });
+      if (error) {
+        console.error('[Login] OAuth error:', error);
+        Alert.alert('Error', error.message ?? 'No se pudo iniciar con OAuth.');
+        setLoading(false);
+      }
+      // En OAuth el control se transfiere al provider; al volver a /auth/callback,
+      // el AuthContext se hidrata y redirige.
     } catch (e: any) {
+      console.error('[Login] OAuth unexpected:', e);
       Alert.alert('Error', e?.message ?? 'No se pudo iniciar con OAuth.');
       setLoading(false);
     }
-  };
+  }, []);
 
   return (
-    <View style={styles.screen}>
+    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.card}>
         <Text style={styles.brand}>Instagram</Text>
 
@@ -48,6 +82,7 @@ export default function LoginPage() {
           style={styles.input}
           autoCapitalize="none"
           keyboardType="email-address"
+          editable={!loading}
         />
         <TextInput
           value={pass}
@@ -56,10 +91,12 @@ export default function LoginPage() {
           placeholderTextColor="#777"
           style={styles.input}
           secureTextEntry
+          editable={!loading}
+          onSubmitEditing={signInEmail}
         />
 
-        <Pressable disabled={loading} onPress={signInEmail} style={[styles.btn, loading && { opacity: 0.7 }]}>
-          <Text style={styles.btnText}>Iniciar sesión</Text>
+        <Pressable disabled={!canSubmit} onPress={signInEmail} style={[styles.btn, !canSubmit && { opacity: 0.6 }]}>
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Iniciar sesión</Text>}
         </Pressable>
 
         <View style={{ height: 14 }} />
@@ -85,7 +122,7 @@ export default function LoginPage() {
           </Link>
         </Text>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -112,7 +149,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   btn: { backgroundColor: '#0095f6', borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
-  oauthBtn: { borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
+  oauthBtn: { borderRadius: 8, paddingVertical: 10, alignItems: 'center', marginTop: 8 },
   btnText: { color: '#fff', fontWeight: '700' },
   footer: { color: '#bbb', textAlign: 'center', marginTop: 12 },
   link: { color: '#0095f6', fontWeight: '700' },

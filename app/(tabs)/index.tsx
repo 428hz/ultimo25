@@ -1,57 +1,75 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, ActivityIndicator, FlatList, RefreshControl, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { listPosts, type PostWithProfile } from '@/services/posts';
 import PostCard from '@/components/Posts/PostCard';
-import { listPosts } from '@/services/posts';
-import type { PostData } from '@/components/Posts/types';
 
-export default function FeedScreen() {
-  const [posts, setPosts] = useState<PostData[]>([]);
+export default function HomeScreen() {
+  const [items, setItems] = useState<PostWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = async () => {
+    setError(null);
+    setLoading(true);
     const res = await listPosts();
-    if (!res.ok) {
-      Alert.alert('Error', res.message);
-      return;
-    }
-    // listPosts devuelve id/author_id/media_url/text_content; PostCard acepta profiles como opcional
-    setPosts(res.data as unknown as PostData[]);
-  }, []);
+    if (!res.ok) setError(res.message || 'No se pudieron cargar los posts');
+    setItems(res.ok ? res.data : []);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      await load();
-      setLoading(false);
-    })();
-  }, [load]);
+    load();
+  }, []);
 
-  const onRefresh = useCallback(async () => {
+  const onRefresh = async () => {
     setRefreshing(true);
     await load();
     setRefreshing(false);
-  }, [load]);
-
-  const handleDeleted = useCallback((deletedId: string | number) => {
-    setPosts((prev) => prev.filter((p) => String(p.id) !== String(deletedId)));
-  }, []);
+  };
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={styles.center}>
         <ActivityIndicator />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.center}>
+        <Text style={{ color: '#fff' }}>{error}</Text>
+      </View>
+    );
+  }
+
+  if (!items.length) {
+    return (
+      <View style={styles.center}>
+        <Text style={{ color: '#777' }}>No hay publicaciones</Text>
       </View>
     );
   }
 
   return (
     <FlatList
-      data={posts}
+      data={items}
       keyExtractor={(p) => String(p.id)}
-      renderItem={({ item }) => <PostCard postData={item} onDelete={handleDeleted} />}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      contentContainerStyle={{ paddingBottom: 80 }}
+      renderItem={({ item }) => <PostCard postData={{
+        id: item.id,
+        author_id: item.author_id,
+        media_url: item.media_url,
+        text_content: item.text_content,
+        profiles: item.profiles ?? undefined,
+      }} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
+      contentContainerStyle={{ paddingVertical: 10 }}
+      style={{ backgroundColor: '#000' }}
     />
   );
 }
+
+const styles = StyleSheet.create({
+  center: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
+});
